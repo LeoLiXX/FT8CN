@@ -86,6 +86,7 @@ public final class UsbId {
     public static final int IC_R30 = 0x002b;
     public static final int IC_705 = 0x0036;
     public static final int ICOM_USB_SERIAL_CONTROL = 0x0018;
+    public static final int IC_7300_MK2 = 0x0052;//IC-7300 MK II（CI-V 默认地址 0xB6）
     public static final int XIEGU_X6100 = 0x55D2;//xiegu
 
     private UsbId() {
