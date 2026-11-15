@@ -423,8 +423,9 @@ public class CableSerialPort {
         @SuppressLint("DefaultLocale")
         @Override
         public String toString() {
-            return String.format("SerialPort:deviceId=0x%04X, vendorId=0x%04X, portNum=%d"
-                    , deviceId, vendorId, portNum);
+            //带上 productId，方便在同为 Icom 的多个型号之间区分（0x0018=IC-7300，0x0052=IC-7300 MK II）
+            return String.format("device=0x%04X  vid=0x%04X  pid=0x%04X  port=%d"
+                    , deviceId, vendorId, productId, portNum);
         }
 
         @SuppressLint("DefaultLocale")
