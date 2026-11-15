@@ -342,7 +342,8 @@ public class CdcAcmSerialDriver implements UsbSerialDriver {
                 new int[]{
                         UsbId.IC_R30,
                         UsbId.IC_705,
-                        UsbId.ICOM_USB_SERIAL_CONTROL
+                        UsbId.ICOM_USB_SERIAL_CONTROL,
+                        UsbId.IC_7300_MK2
                 });
         supportedDevices.put(UsbId.VENDOR_QINHENG, new int[]{
                 UsbId.XIEGU_X6100,//协谷X6100

@@ -31,6 +31,8 @@ public class IcomRig extends BaseRig {
     private Timer meterTimer;//查询meter的Timer
 
     private boolean oldVersion = false;//针对老电台，可能不支持SWR查询
+    private int unknownAddressCandidate = -1;//猜测中的电台地址（用于CI-V地址学习）
+    private int unknownAddressCount = 0;//连续收到该地址应答的次数
     //private boolean isPttOn = false;
 
     @Override
@@ -41,12 +43,13 @@ public class IcomRig extends BaseRig {
         swrAlert = false;
         if (on) {
             //修正连接方式0x03是wlan,01是usb，0x02是usb+mic，确保声音能发送到电台
+            //IC-7300 / IC-7300 MK II 的 DATA MOD 菜单项不同，按型号选择（见 setConnectorDataModeByModel）
             if (GeneralVariables.connectMode == ConnectMode.NETWORK) {
-                sendCivData(IcomRigConstant.setConnectorDataMode(ctrAddress, getCivAddress(), (byte) 0x03));
+                sendCivData(IcomRigConstant.setConnectorDataModeByModel(ctrAddress, getCivAddress(), (byte) 0x03));
             } else if (GeneralVariables.connectMode == ConnectMode.USB_CABLE) {
-                sendCivData(IcomRigConstant.setConnectorDataMode(ctrAddress, getCivAddress(), (byte) 0x01));
+                sendCivData(IcomRigConstant.setConnectorDataModeByModel(ctrAddress, getCivAddress(), (byte) 0x01));
             } else {
-                sendCivData(IcomRigConstant.setConnectorDataMode(ctrAddress, getCivAddress(), (byte) 0x02));
+                sendCivData(IcomRigConstant.setConnectorDataModeByModel(ctrAddress, getCivAddress(), (byte) 0x02));
             }
         }
 
@@ -164,6 +167,29 @@ public class IcomRig extends BaseRig {
         }
         if (icomCommand == null) {
             return;
+        }
+
+        //CI-V 地址学习：连续 3 次收到同一个"非配置地址"的应答就采纳它。
+        //（IC-7300=0x94，IC-7300 MK II=0xB6…出厂地址各不相同，避免用户配错就完全不通）
+        int fromAddr = IcomCommand.getFromAddress();
+        if (fromAddr > 0 && fromAddr != getCivAddress()) {
+            if (fromAddr == unknownAddressCandidate) {
+                unknownAddressCount++;
+            } else {
+                unknownAddressCandidate = fromAddr;
+                unknownAddressCount = 1;
+            }
+            if (unknownAddressCount >= 3) {
+                Log.w(TAG, String.format("连续%d次收到0x%02X的应答（原配置0x%02X），自动采纳该地址。"
+                        , unknownAddressCount, fromAddr, getCivAddress()));
+                setCivAddress(fromAddr);
+                GeneralVariables.civAddress = fromAddr;//同步到配置，避免下次再错
+                unknownAddressCandidate = -1;
+                unknownAddressCount = 0;
+            }
+        } else {
+            unknownAddressCandidate = -1;
+            unknownAddressCount = 0;
         }
 
         //目前只对频率和模式消息作反应

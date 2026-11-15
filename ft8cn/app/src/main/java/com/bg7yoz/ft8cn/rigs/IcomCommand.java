@@ -6,6 +6,17 @@ import android.util.Log;
 public class IcomCommand {
     private static final String TAG = "RigCommand";
     private byte[] rawData;
+    private static int fromAddress = -1;//最近一条指令的来源地址（电台地址）
+
+    /**
+     * 最近一条指令的来源地址（0x01~0xDF），用于“地址学习”。
+     * 没有解析到指令时返回 -1。
+     *
+     * @return 电台地址
+     */
+    public static int getFromAddress() {
+        return fromAddress;
+    }
 
     /**
      * 获取主命令
@@ -115,8 +126,13 @@ public class IcomCommand {
             if (buffer[i] == (byte) 0xfe
                     && buffer[i + 1] == (byte) 0xfe//命令头0xfe 0xfe
                     && (buffer[i + 2] == (byte) ctrAddr || (buffer[i + 2] == (byte) 0x00))//控制者地址默认E0或00
-                    && buffer[i + 3] == (byte) rigAddr) {//电台地址，705的默认值是A4，协谷是70
+                    //电台地址：不再强制等于配置的地址。
+                    //CI-V 电台的出厂默认地址各不相同（IC-7300=0x94，IC-7300 MK II=0xB6…），
+                    //这里如果硬校验，配置与实际不一致时所有应答都会被丢掉，表现为“什么都读不到”。
+                    && buffer[i + 3] != (byte) 0x00
+                    && (buffer[i + 3] & 0xff) < 0xE0) {
                 position = i;
+                fromAddress = buffer[i + 3] & 0xff;
                 break;
             }
         }

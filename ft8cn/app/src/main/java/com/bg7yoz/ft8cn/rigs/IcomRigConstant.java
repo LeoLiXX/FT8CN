@@ -203,6 +203,37 @@ public class IcomRigConstant {
         data[9] = (byte) 0xfd;
         return data;
     }
+    //IC-7300 / IC-7300 MK II 的出厂默认 CI-V 地址
+    public static final int IC7300_ADDRESS = 0x94;
+    public static final int IC7300_MK2_ADDRESS = 0xB6;
+
+    /**
+     * 按型号设置 DATA MOD（USB 音频来源）。
+     * IC-7300     : 1A 05 00 67 03
+     * IC-7300 MKII: 1A 05 00 85 01
+     * 其它型号    : 沿用 1A 05 01 19 &lt;mode&gt;（IC-705 等）
+     *
+     * @param ctrAddr 控制者地址
+     * @param rigAddr 电台地址
+     * @param mode    数据连接方式（0x01=USB, 0x02=USB+MIC, 0x03=WLAN）
+     * @return 指令数据包
+     */
+    public static byte[] setConnectorDataModeByModel(int ctrAddr, int rigAddr, byte mode) {
+        if (rigAddr == IC7300_MK2_ADDRESS) {
+            //IC-7300 MK II：1A 05 00 85 01
+            return new byte[]{(byte) 0xfe, (byte) 0xfe, (byte) rigAddr, (byte) ctrAddr,
+                    (byte) CMD_CONNECTORS, (byte) CMD_CONNECTORS_DATA_MODE,
+                    (byte) 0x00, (byte) 0x85, (byte) 0x01, (byte) 0xfd};
+        }
+        if (rigAddr == IC7300_ADDRESS) {
+            //IC-7300：1A 05 00 67 03
+            return new byte[]{(byte) 0xfe, (byte) 0xfe, (byte) rigAddr, (byte) ctrAddr,
+                    (byte) CMD_CONNECTORS, (byte) CMD_CONNECTORS_DATA_MODE,
+                    (byte) 0x00, (byte) 0x67, (byte) 0x03, (byte) 0xfd};
+        }
+        return setConnectorDataMode(ctrAddr, rigAddr, mode);
+    }
+
     public static byte[] setOperationMode(int ctrAddr, int rigAddr, int mode) {
         //06指令，例如USB=01：FE FE A1 E0 06 01 FD
         byte[] data = new byte[8];

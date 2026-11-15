@@ -13,6 +13,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.hardware.usb.UsbConstants;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
@@ -47,7 +48,8 @@ public class CableSerialPort {
     private BroadcastReceiver broadcastReceiver;
     private final Context context;
 
-    private int vendorId = 0x0c26;//设备号
+    private int vendorId = 0x0c26;//厂商号
+    private int productId = 0;//产品号（优先按它精确匹配，避免同厂商多型号混淆）
     private int portNum = 0;//端口号
     private int baudRate = 19200;//波特率
 
@@ -64,6 +66,7 @@ public class CableSerialPort {
 
     public CableSerialPort(Context mContext, SerialPort serialPort, int baud, OnConnectorStateChanged connectorStateChanged) {
         vendorId = serialPort.vendorId;
+        productId = serialPort.productId;
         portNum = serialPort.portNum;
         baudRate = baud;
         context = mContext;
@@ -102,23 +105,43 @@ public class CableSerialPort {
         }
 
 
+        //优先按 (vendorId, productId) 精确匹配；匹配不到再退回"同厂商"的设备。
+        //注意：Icom 同一厂商下有多个 PID（IC-7300=0x0018、IC-7300 MK II=0x0052…），
+        //只按 vendorId 匹配会拿到设备列表里最后一个 Icom 设备，容易选错型号。
+        UsbDevice sameVendorDevice = null;
         for (UsbDevice v : usbManager.getDeviceList().values()) {
-            if (v.getVendorId() == vendorId) {
-                device = v;
+            if (v.getVendorId() != vendorId) {
+                continue;
             }
+            if (v.getProductId() == productId) {
+                device = v;
+                break;
+            }
+            if (sameVendorDevice == null) {
+                sameVendorDevice = v;
+            }
+        }
+        if (device == null) {
+            device = sameVendorDevice;
         }
         if (device == null) {
             Log.e(TAG, String.format("串口设备打开失败: 没有找到设备0x%04x", vendorId));
             return false;
         }
+        Log.d(TAG, String.format("串口设备: VID=0x%04X PID=0x%04X deviceId=0x%04X"
+                , device.getVendorId(), device.getProductId(), device.getDeviceId()));
         driver = UsbSerialProber.getDefaultProber().probeDevice(device);
         if (driver == null) {
             //试着把未知的设备加入到cdc驱动上
             driver = new CdcAcmSerialDriver(device);
         }
-        if (driver.getPorts().size() < portNum) {
+        if (driver.getPorts().size() == 0) {
             Log.e(TAG, "串口号不存在，无法打开。");
             return false;
+        }
+        if (driver.getPorts().size() <= portNum) {
+            Log.w(TAG, String.format("端口号%d不存在，改用0号端口。", portNum));
+            portNum = 0;
         }
         Log.d(TAG, "connect: port size:" + String.valueOf(driver.getPorts().size()));
         usbSerialPort = driver.getPorts().get(portNum);
@@ -309,6 +332,14 @@ public class CableSerialPort {
         this.vendorId = deviceId;
     }
 
+    public int getProductId() {
+        return productId;
+    }
+
+    public void setProductId(int productId) {
+        this.productId = productId;
+    }
+
     public int getPortNum() {
         return portNum;
     }
@@ -337,10 +368,13 @@ public class CableSerialPort {
 
         for (UsbDevice device : usbManager.getDeviceList().values()) {
             UsbSerialDriver driver = UsbSerialProber.getDefaultProber().probeDevice(device);
+            if (driver == null && hasCdcInterface(device)) {
+                //probeTable 未登记的 VID/PID（例如 Icom 新机型 PID 变了）也允许按 CDC 尝试，
+                //否则新设备在串口列表里根本不会出现。
+                driver = new CdcAcmSerialDriver(device);
+            }
             if (driver == null) {
                 continue;
-                //试着把未知的设备加入到cdc驱动上
-                //driver = new CdcAcmSerialDriver(device);
             }
             for (int i = 0; i < driver.getPorts().size(); i++) {
                 serialPorts.add(new SerialPort(device.getDeviceId(), device.getVendorId()
@@ -348,6 +382,24 @@ public class CableSerialPort {
             }
         }
         return serialPorts;
+    }
+
+    /**
+     * 判断设备是否暴露了 CDC 接口（通信类或数据类）。
+     * 用于 probeTable 里没有登记、但其实就是 CDC-ACM 串口的设备（Icom 新型号常见）。
+     *
+     * @param device USB设备
+     * @return 是否有 CDC 接口
+     */
+    private static boolean hasCdcInterface(UsbDevice device) {
+        for (int i = 0; i < device.getInterfaceCount(); i++) {
+            int interfaceClass = device.getInterface(i).getInterfaceClass();
+            if (interfaceClass == UsbConstants.USB_CLASS_COMM
+                    || interfaceClass == UsbConstants.USB_CLASS_CDC_DATA) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public boolean isConnected() {
