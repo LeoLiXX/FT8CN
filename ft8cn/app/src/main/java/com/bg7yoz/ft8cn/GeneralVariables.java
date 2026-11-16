@@ -734,7 +734,7 @@ public class GeneralVariables {
 //    public static void shareFile(Context context, File file, String title) {
 //        Intent sharingIntent = new Intent(Intent.ACTION_SEND);
 //        Uri fileUri = FileProvider.getUriForFile(context.getApplicationContext()
-//                , "com.bg7yoz.ft8cn.fileprovider", file);
+//                , context.getPackageName() + ".fileprovider", file);
 //        //sharingIntent.setType("application/octet-stream");
 //        sharingIntent.setType("text/plain");
 //        sharingIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
