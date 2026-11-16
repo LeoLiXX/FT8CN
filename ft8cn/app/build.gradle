@@ -83,10 +83,9 @@ android {
             buildConfigField("String", "apkBuildTime", "\"${currentTime}\"")
         }
         release {
-            if (!hasReleaseSigning) {
-                throw new GradleException("Missing release signing config. Set FT8CN_RELEASE_* environment variables or create keystore.properties.")
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
             }
-            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             buildConfigField("String", "apkBuildTime", "\"${currentTime}\"")
@@ -110,6 +109,19 @@ android {
         }
     }
     namespace 'com.bg7yoz.ft8cn'
+}
+
+gradle.taskGraph.whenReady { graph ->
+    def releasePackagingRequested = graph.allTasks.any { task ->
+        task.project == project && (
+                task.name == 'assembleRelease'
+                        || task.name == 'bundleRelease'
+                        || task.name == 'installRelease'
+        )
+    }
+    if (!hasReleaseSigning && releasePackagingRequested) {
+        throw new GradleException("Missing release signing config. Set FT8CN_RELEASE_* environment variables or create keystore.properties.")
+    }
 }
 
 dependencies {
