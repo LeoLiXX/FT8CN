@@ -57,7 +57,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.bg7yoz.ft8cn"
+        applicationId "com.bi9clt.ft8cn"
         minSdk 23
         targetSdk 33
         versionCode 3
