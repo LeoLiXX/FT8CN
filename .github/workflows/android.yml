@@ -10,6 +10,9 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ft8cn
 
     steps:
     - uses: actions/checkout@v4
@@ -20,7 +23,31 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
+    - name: Decode release keystore
+      if: github.event_name == 'push'
+      env:
+        FT8CN_RELEASE_KEYSTORE_BASE64: ${{ secrets.FT8CN_RELEASE_KEYSTORE_BASE64 }}
+      run: echo "$FT8CN_RELEASE_KEYSTORE_BASE64" | base64 -d > release-keystore.jks
+
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
-    - name: Build with Gradle
+
+    - name: Build debug APK (pull request)
+      if: github.event_name == 'pull_request'
+      run: ./gradlew assembleDebug
+
+    - name: Build signed release (release push)
+      if: github.event_name == 'push'
       run: ./gradlew build
+      env:
+        FT8CN_RELEASE_STORE_FILE: release-keystore.jks
+        FT8CN_RELEASE_STORE_PASSWORD: ${{ secrets.FT8CN_RELEASE_STORE_PASSWORD }}
+        FT8CN_RELEASE_KEY_ALIAS: ${{ secrets.FT8CN_RELEASE_KEY_ALIAS }}
+        FT8CN_RELEASE_KEY_PASSWORD: ${{ secrets.FT8CN_RELEASE_KEY_PASSWORD }}
+
+    - name: Upload release APK
+      if: github.event_name == 'push'
+      uses: actions/upload-artifact@v4
+      with:
+        name: ft8cn-release-apk
+        path: ft8cn/app/build/outputs/apk/release/*.apk
